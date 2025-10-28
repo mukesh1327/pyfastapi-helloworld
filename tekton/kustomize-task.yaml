@@ -1,71 +1,155 @@
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
+
   name: kustomize-update-image-tag
+
 spec:
   description: |
     Updates an image tag in a Kustomize kustomization.yaml file,
     commits, and pushes the change back to the Git repo.
   params:
-    - name: image-name
+    - default: /home/git
+      description: |
+        Absolute path to the Git user home directory.
+      name: USER_HOME
       type: string
-      description: Full image name (e.g. quay.io/org/app)
-    - name: new-tag
+    - default: mukesh1327
+      description: |
+        user name.
+      name: GIT_USER_NAME
       type: string
-      description: New image tag to set
-    - name: kustomize-dir
+    - default: mugicoder13@gmail.com
+      description: |
+        user email.
+      name: GIT_USER_EMAIL
       type: string
+    - description: Full image name (e.g. quay.io/org/app)
+      name: image-name
+      type: string
+    - description: New image tag to set
+      name: new-tag
+      type: string
+    - default: overlays/dev
       description: Path to the kustomization.yaml file directory
-      default: "overlays/dev"
-    - name: git-user-name
+      name: kustomize-dir
       type: string
-      default: "Tekton Bot"
-    - name: git-user-email
+    - default: 'chore: update image tag via Tekton'
+      name: commit-message
       type: string
-      default: "tekton@bot.local"
-    - name: commit-message
-      type: string
-      default: "chore: update image tag via Tekton"
-
-  workspaces:
-    - name: source
-      description: The workspace containing the cloned Git repo
-
+  stepTemplate:
+    computeResources: {}
+    env:
+      - name: WORKSPACES_BASIC_AUTH_BOUND
+        value: $(workspaces.basic-auth.bound)
+      - name: WORKSPACES_BASIC_AUTH_PATH
+        value: $(workspaces.basic-auth.path)
+      - name: PARAMS_USER_HOME
+        value: $(params.USER_HOME)
+      - name: PARAMS_GIT_USER_NAME
+        value: $(params.GIT_USER_NAME)
+      - name: PARAMS_GIT_USER_EMAIL
+        value: $(params.GIT_USER_EMAIL)
   steps:
-    - name: update-image
-      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-      workingDir: $(workspaces.source.path)
+    - computeResources: {}
+      image: 'quay.io/mukeshs1306/ubi9-kustomize:latest'
+      name: update-image
       script: |
         #!/bin/bash
         set -e
 
-        echo "Updating image tag in $(params.kustomize-dir)/kustomization.yaml"
+        pwd
+
         cd $(params.kustomize-dir)
 
-        # Ensure yq or sed available
-        microdnf install -y kustomize git >/dev/null
+        pwd
 
-        # Show existing images
-        echo "Before:"
-        kustomize edit list images || true
+        ls -la
 
         # Update image tag
         kustomize edit set image $(params.image-name)=$(params.image-name):$(params.new-tag)
 
-        echo "After:"
-        kustomize edit list images
-
-    - name: commit-and-push
-      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:8f0494341244a75546a4b80b065702be04e6d200421aa4e7ec90385c9dabc6ab
+        # New updated image is
+        echo "$(params.image-name)=$(params.image-name):$(params.new-tag)"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
       workingDir: $(workspaces.source.path)
+    - computeResources: {}
+      env:
+        - name: SOURCE_DIR
+          value: $(workspaces.source.path)
+      image: 'registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:8f0494341244a75546a4b80b065702be04e6d200421aa4e7ec90385c9dabc6ab'
+      name: commit-and-push
       script: |
         #!/bin/bash
-        set -e
+        set -eux
 
-        git config user.name "$(params.git-user-name)"
-        git config user.email "$(params.git-user-email)"
+        export WORKSPACES_BASIC_AUTH_BOUND="${WORKSPACES_BASIC_AUTH_BOUND:-}"
+        export WORKSPACES_BASIC_AUTH_PATH="${WORKSPACES_BASIC_AUTH_PATH:-}"
+        export PARAMS_GIT_USER_EMAIL="${PARAMS_GIT_USER_EMAIL:-}"
+        export PARAMS_GIT_USER_NAME="${PARAMS_GIT_USER_NAME:-}"
 
-        git add $(params.kustomize-dir)/kustomization.yaml
+        phase() {
+            echo "---> Phase: ${@}..."
+        }
+
+        copy_or_fail() {
+            local _mode="${1}"
+            local _src="${2}"
+            local _dst="${3}"
+
+            if [[ ! -f "${_src}" && ! -d "${_src}" ]]; then
+                fail "Source file/directory is not found at '${_src}'"
+            fi
+
+            if [[ -d "${_src}" ]]; then
+                cp -Rv ${_src} ${_dst}
+                chmod -v ${_mode} ${_dst}
+            else
+                install --verbose --mode=${_mode} ${_src} ${_dst}
+            fi
+        }
+
+        cd $(workspaces.source.path)
+
+        echo "Current directory: $(pwd)"
+
+        ls -la
+
+        echo "Git status before commit:"
+        git status || true
+
+        # Fix safe.directory issue (Tekton runs as root or arbitrary UID)
+        git config --global --add safe.directory $(pwd)
+
+
+        if [[ "${WORKSPACES_BASIC_AUTH_BOUND}" == "true" ]]; then
+            phase "Configuring Git authentication with 'basic-auth' Workspace files"
+            for f in .git-credentials .gitconfig; do
+                src="${WORKSPACES_BASIC_AUTH_PATH}/${f}"
+                phase "Copying '${src}' to '${PARAMS_USER_HOME}'"
+                copy_or_fail 400 ${src} "${PARAMS_USER_HOME}/"
+            done
+        fi
+
+        if [ -n "${PARAMS_GIT_USER_EMAIL}" ]; then
+            phase "Setting global email for git ${PARAMS_GIT_USER_EMAIL}"
+            git config --global user.email "${PARAMS_GIT_USER_EMAIL}"
+        fi
+
+        if [ -n "${PARAMS_GIT_USER_NAME}" ]; then
+            phase "Setting global username for git ${PARAMS_GIT_USER_NAME}"
+            git config --global user.name "${PARAMS_GIT_USER_NAME}"
+        fi
+
+        # Verify .git is valid
+        if [ ! -d ".git" ]; then
+          echo "Error: .git directory missing!"
+          exit 1
+        fi
+
+        git add $(params.kustomize-dir)/kustomization.yaml || true
 
         if git diff --cached --quiet; then
           echo "No changes to commit."
@@ -74,3 +158,24 @@ spec:
           echo "Pushing changes..."
           git push origin HEAD
         fi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      volumeMounts:
+        - mountPath: $(params.USER_HOME)
+          name: user-home
+      workingDir: $(workspaces.source.path)
+  volumes:
+    - emptyDir: {}
+      name: user-home
+  workspaces:
+    - description: The workspace containing the cloned Git repo
+      name: source
+    - description: |
+        A Workspace containing a `.gitconfig` and `.git-credentials` files.
+        These will be copied to the user's home before Git commands run. All
+        other files in this Workspace are ignored. It is strongly recommended to
+        use `ssh-directory` over `basic-auth` whenever possible, and to bind a
+        Secret to this Workspace over other volume types.
+      name: basic-auth
+      optional: true
