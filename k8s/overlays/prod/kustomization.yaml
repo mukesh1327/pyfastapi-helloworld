@@ -6,7 +6,7 @@ resources:
 images:
 - name: quay.io/mukeshs1306/py-fastapi-helloworld
   newName: quay.io/mukeshs1306/py-fastapi-helloworld
-  newTag: f516d69e1aa62ee035e3d715e971e868471b7081
+  newTag: 95119bb37c5dec23e0f3c2a77927bab0eb68f54e
 
 commonLabels:
   environment: prod
