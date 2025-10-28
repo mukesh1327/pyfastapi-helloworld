@@ -2,13 +2,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
 
-  annotations:
-    openshift.io/installed-from: ArtifactHub
-    tekton.dev/categories: Testing
-    tekton.dev/displayName: pytest
-
   name: pytest
-
 
 spec:
   description: This task will run pytest on the provided input.
@@ -25,6 +19,10 @@ spec:
       description: The path to the source code
       name: SOURCE_PATH
       type: string
+    - default: .
+      description: The path to the source code
+      name: SUB_SOURCE_PATH
+      type: string
     - default: requirements.txt
       description: 'The name of the requirements file inside the source location, with fallback to the requirements file in the root location'
       name: REQUIREMENTS_FILE
@@ -33,7 +31,6 @@ spec:
       description: The name of the custom pip config file.
       name: PIP_CONF_FILE
       type: string
-
   steps:
     - computeResources: {}
       env:
@@ -43,40 +40,38 @@ spec:
           value: $(workspaces.pip-conf.bound)
         - name: WORKSPACE_PIP_CONF_PATH
           value: $(workspaces.pip-conf.path)
-          
       image: $(params.PYTHON_IMAGE)
-  
       name: unit-test
       script: |
         export PATH=$PATH:$HOME/.local/bin
 
-        echo "Running on folder "$(params.SOURCE_PATH)" "
+        echo "Running on folder "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)" "
 
         if [ "${WORKSPACE_PIP_CONF_BOUND}" = "true" ] ; then
           export PIP_CONFIG_FILE="${WORKSPACE_PIP_CONF_PATH}/${PARAM_PIP_CONF_FILE}"
         fi
 
-        if [ -e "$(params.SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)" ];
+        if [ -e "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)" ];
         then
-          pip install -r "$(params.SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)"
+          pip install -r "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)"
           pip show pytest || {
             printf "###\nWarning: Pytest is missing in your test requirements file\n###";
             pip install pytest
           }
 
         else
-          if [ -e "$(params.REQUIREMENTS_FILE)" ];
+          if [ -e "$(params.SUB_SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)" ];
           then
-            pip install -r "$(params.REQUIREMENTS_FILE)"
+            pip install -r "$(params.SUB_SOURCE_PATH)"/"$(params.REQUIREMENTS_FILE)"
           fi
           pip install pytest
         fi
         if [ -z "$(params.ARGS)" ]; then
-          pytest "$(params.SOURCE_PATH)"
+          pytest "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)"/
         else
-          echo "Running on folder "$(params.SOURCE_PATH)" "
+          echo "Running on folder "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)" "
 
-          pytest "$(params.ARGS)" "$(params.SOURCE_PATH)"
+          pytest "$(params.ARGS)" "$(params.SOURCE_PATH)"/"$(params.SUB_SOURCE_PATH)"
         fi
       workingDir: $(workspaces.source.path)
   workspaces:

@@ -66,13 +66,10 @@ spec:
           workspace: source-code
 
 
-
-    # Container image build
     - name: buildah-docker
       params:
         - name: IMAGE
-          value: >-
-            quay.io/mukeshs1306/$(context.pipeline.name):$(tasks.clone-project.results.COMMIT)
+          value: 'quay.io/mukeshs1306/$(context.pipeline.name):$(tasks.git-clone.results.COMMIT)'
         - name: DOCKERFILE
           value: ./Containerfile
         - name: BUILD_ARGS
@@ -108,21 +105,22 @@ spec:
         - name: source
           workspace: source-code
 
+
     - name: update-image-tag
+      params:
+        - name: image-name
+          value: quay.io/mukeshs1306/$(context.pipeline.name)
+        - name: new-tag
+          value: $(tasks.git-clone.results.COMMIT)
+        - name: kustomize-dir
+          value: k8s/overlays/prod
       runAfter:
         - buildah-docker
       taskRef:
+        kind: Task
         name: kustomize-update-image-tag
       workspaces:
         - name: source
           workspace: source-code
-      params:
-        - name: image-name
-          value: "quay.io/mukeshs1306/$(context.pipeline.name)"
-        - name: new-tag
-          value: "$(params.tag)"
-        - name: kustomize-dir
-          value: "k8s/overlays/prod"
-
   workspaces:
     - name: source-code

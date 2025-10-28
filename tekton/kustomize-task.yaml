@@ -9,6 +9,16 @@ spec:
     Updates an image tag in a Kustomize kustomization.yaml file,
     commits, and pushes the change back to the Git repo.
   params:
+    - default: main
+      description: |
+        Revision to checkout, an branch, tag, sha, ref, etc...
+      name: REVISION
+      type: string
+    - default: ''
+      description: |
+        Repository `refspec` to fetch before checking out the revision.
+      name: REFSPEC
+      type: string
     - default: /home/git
       description: |
         Absolute path to the Git user home directory.
@@ -37,6 +47,12 @@ spec:
     - default: 'chore: update image tag via Tekton'
       name: commit-message
       type: string
+    - default: 'true'
+      description: |
+        Sets the global `http.sslVerify` value, `false` is not advised unless
+        you trust the remote repository.
+      name: SSL_VERIFY
+      type: string
   stepTemplate:
     computeResources: {}
     env:
@@ -50,6 +66,12 @@ spec:
         value: $(params.GIT_USER_NAME)
       - name: PARAMS_GIT_USER_EMAIL
         value: $(params.GIT_USER_EMAIL)
+      - name: PARAMS_REVISION
+        value: $(params.REVISION)
+      - name: PARAMS_REFSPEC
+        value: $(params.REFSPEC)
+      - name: PARAMS_SSL_VERIFY
+        value: $(params.SSL_VERIFY)
   steps:
     - computeResources: {}
       image: 'quay.io/mukeshs1306/ubi9-kustomize:latest'
@@ -83,12 +105,16 @@ spec:
       name: commit-and-push
       script: |
         #!/bin/bash
+
         set -eux
 
         export WORKSPACES_BASIC_AUTH_BOUND="${WORKSPACES_BASIC_AUTH_BOUND:-}"
         export WORKSPACES_BASIC_AUTH_PATH="${WORKSPACES_BASIC_AUTH_PATH:-}"
         export PARAMS_GIT_USER_EMAIL="${PARAMS_GIT_USER_EMAIL:-}"
         export PARAMS_GIT_USER_NAME="${PARAMS_GIT_USER_NAME:-}"
+        export PARAMS_REVISION="${PARAMS_REVISION:-}"
+        export PARAMS_REFSPEC="${PARAMS_REFSPEC:-}"
+        export PARAMS_SSL_VERIFY="${PARAMS_SSL_VERIFY:-}"
 
         phase() {
             echo "---> Phase: ${@}..."
@@ -149,6 +175,12 @@ spec:
           exit 1
         fi
 
+        git config --global http.sslverify ${PARAMS_SSL_VERIFY}
+
+        git remote -v
+
+        git checkout -b ${PARAMS_REVISION}
+
         git add $(params.kustomize-dir)/kustomization.yaml || true
 
         if git diff --cached --quiet; then
@@ -156,7 +188,8 @@ spec:
         else
           git commit -m "$(params.commit-message): $(params.new-tag)"
           echo "Pushing changes..."
-          git push origin HEAD
+
+          git push origin ${PARAMS_REVISION}
         fi
       securityContext:
         runAsNonRoot: true
