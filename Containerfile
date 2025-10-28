@@ -2,7 +2,7 @@
 # Stage 1: Build and setup environment
 # -------------------------------
 # FROM registry.access.redhat.com/ubi9/python-311:latest AS base
-FROM quay.io/mukeshs1306/python-ubi-fastapi:latest-test AS base
+FROM quay.io/mukeshs1306/python-ubi-fastapi:latest AS base
 
 # Set working directory
 WORKDIR /app
