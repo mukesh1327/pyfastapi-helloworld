@@ -1,20 +1,23 @@
 # namespace: fastapi-prod
 resources:
-  - ../../base
-  - route.yaml
+- ../../base
+- route.yaml
 
 images:
-  - name: quay.io/mukeshs1306/py-fastapi-helloworld
-    newTag: latest
+- name: quay.io/mukeshs1306/py-fastapi-helloworld
+  newName: quay.io/mukeshs1306/py-fastapi-helloworld
+  newTag: f516d69e1aa62ee035e3d715e971e868471b7081
 
 commonLabels:
   environment: prod
 
 configMapGenerator:
-  - name: fastapi-helloworld-config
-    literals:
-      - DISPLAY_TEXT="Hello from Production!"
-      - IMAGE_PATH="/app/rh-developer.jpg"
+- literals:
+  - DISPLAY_TEXT="Hello from Production!"
+  - IMAGE_PATH="/app/rh-developer.jpg"
+  name: fastapi-helloworld-config
 
 generatorOptions:
   disableNameSuffixHash: true
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
