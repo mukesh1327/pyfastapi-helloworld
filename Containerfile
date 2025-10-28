@@ -1,0 +1,33 @@
+# -------------------------------
+# Stage 1: Build and setup environment
+# -------------------------------
+# FROM registry.access.redhat.com/ubi9/python-311:latest AS base
+FROM quay.io/mukeshs1306/python-ubi-fastapi:latest-test AS base
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements if you have one (optional)
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# Alternatively, directly install dependencies here
+# RUN pip install --no-cache-dir fastapi uvicorn
+
+# Copy the FastAPI app
+COPY main.py .
+COPY test_main.py .
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables (can be overridden at runtime)
+ENV IMAGE_PATH=/app/rh-developer.jpg
+ENV DISPLAY_TEXT="Hello from Red Hat FastAPI!"
+
+# Optional: copy a default image to container
+# (replace with your actual image file if available)
+COPY rh-developer.jpg /app/rh-developer.jpg
+
+# Command to run the app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

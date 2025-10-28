@@ -1,0 +1,20 @@
+# namespace: demo-apps
+resources:
+  - ../../base
+  - route.yaml
+
+images:
+  - name: quay.io/mukeshs1306/py-fastapi-helloworld
+    newTag: latest
+
+commonLabels:
+  environment: dev
+
+configMapGenerator:
+  - name: fastapi-helloworld-config
+    literals:
+      - DISPLAY_TEXT="Hello from Dev Environment!"
+      - IMAGE_PATH="/app/rh-developer.jpg"
+
+generatorOptions:
+  disableNameSuffixHash: true
