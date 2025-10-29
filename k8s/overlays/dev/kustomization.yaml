@@ -9,6 +9,7 @@ images:
 
 commonLabels:
   environment: dev
+  app: py-hello
 
 configMapGenerator:
   - name: fastapi-helloworld-config
@@ -17,4 +18,5 @@ configMapGenerator:
       - IMAGE_PATH="/app/rh-developer.jpg"
 
 generatorOptions:
+
   disableNameSuffixHash: true
