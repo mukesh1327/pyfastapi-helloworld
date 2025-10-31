@@ -4,7 +4,7 @@ metadata:
   name: fastapi-hello-world-prod
 
 spec:
-  subdomain: fastapi-hello-world-prod
+  # subdomain: fastapi-hello-world-prod
   path: /
   to:
     kind: Service
